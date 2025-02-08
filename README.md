@@ -17,7 +17,7 @@ Recommended to add an entiry to the context menu of folder backgrounds.
 Windows Registry Editor Version 5.00
 
 [HKEY_CLASSES_ROOT\Directory\Background\shell\seqnum]
-@="‰æ‘œ‚ð˜A”Ô‰»"
+@="Rename to sequential numbers"
 
 [HKEY_CLASSES_ROOT\Directory\Background\shell\seqnum\command]
 @="\"C:\\bin\\seqnum.exe\" \"%V\""
