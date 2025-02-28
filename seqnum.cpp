@@ -15,7 +15,7 @@ const struct {
 
 static bool isFile(IShellItem* item) {
 	SFGAOF attrs;
-	return SUCCEEDED(item->GetAttributes(SFGAO_CANMOVE | SFGAO_CANRENAME | SFGAO_FOLDER | SFGAO_FILESYSTEM, &attrs)) &&
+	return SUCCEEDED(item->GetAttributes(SFGAO_CANMOVE | SFGAO_CANRENAME | SFGAO_HIDDEN | SFGAO_FOLDER | SFGAO_FILESYSTEM, &attrs)) &&
 		attrs == (SFGAO_CANMOVE | SFGAO_CANRENAME | SFGAO_FILESYSTEM);
 }
 
@@ -24,7 +24,10 @@ static IShellItem* tempdir(const WCHAR* parent, WCHAR path[MAX_PATH]) {
 	if (CreateDirectoryW(path, nullptr)) {
 		IShellItem* item;
 		if SUCCEEDED(SHCreateItemFromParsingName(path, nullptr, IID_PPV_ARGS(&item))) {
+			SetFileAttributesW(path, FILE_ATTRIBUTE_HIDDEN);
 			return item;
+		} else {
+			RemoveDirectoryW(path);
 		}
 	}
 	return nullptr;
@@ -34,13 +37,6 @@ struct Entry {
 	IShellItem* item;
 	WCHAR* name;	// CoTaskMem
 	const WCHAR* ext;	// static string
-
-	friend bool operator < (const Entry& lhs, const Entry& rhs) {
-		if (int r = StrCmpLogicalW(lhs.name, rhs.name))
-			return r < 0;
-		else
-			return wcscmp(lhs.name, rhs.name) < 0;
-	}
 };
 
 static const WCHAR* isTarget(const WCHAR* name) {
@@ -53,7 +49,7 @@ static const WCHAR* isTarget(const WCHAR* name) {
 	return nullptr;
 }
 
-static size_t enumEntries(IShellItem* parent, std::set<Entry>& entries) {
+static size_t enumEntries(IShellItem* parent, std::vector<Entry>& entries) {
 	size_t count = 0;
 	IEnumShellItems* e;
 	if SUCCEEDED(parent->BindToHandler(nullptr, BHID_EnumItems, IID_PPV_ARGS(&e))) {
@@ -63,7 +59,7 @@ static size_t enumEntries(IShellItem* parent, std::set<Entry>& entries) {
 				WCHAR* name;
 				if SUCCEEDED(child->GetDisplayName(SIGDN_PARENTRELATIVEPARSING, &name)) {
 					if (auto ext = isTarget(name)) {
-						entries.insert({ child, name, ext });
+						entries.push_back({ child, name, ext });
 						child->AddRef();
 						++count;
 					}
@@ -102,8 +98,16 @@ static void run(int argc, WCHAR** argv) {
 
 			IShellItem* parent;
 			if SUCCEEDED(SHCreateItemFromParsingName(path, nullptr, IID_PPV_ARGS(&parent))) {
-				std::set<Entry> entries;
+				std::vector<Entry> entries;
 				if (size_t count = enumEntries(parent, entries)) {
+					// sort entries by name in logical order
+					std::sort(entries.begin(), entries.end(), [](const Entry& lhs, const Entry& rhs) {
+						if (int r = StrCmpLogicalW(lhs.name, rhs.name))
+							return r < 0;
+						else
+							return wcscmp(lhs.name, rhs.name) < 0;
+					});
+
 					WCHAR temppath[MAX_PATH];
 					IShellItem* temp = nullptr;
 					WCHAR format[] = L"%08d%s";

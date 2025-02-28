@@ -10,7 +10,8 @@
 #include <shellapi.h>
 #include <shlobj.h>
 #include <shlwapi.h>
-#include <set>
+#include <vector>
+#include <algorithm>
 
 #pragma comment(lib, "shlwapi.lib")
 
